@@ -6,24 +6,26 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-import com.mytomcat.demo.HelloWorldServlet;
-import com.mytomcat.demo.InfoServlet;
 
 public class MyTomcat {
     private int port;
     private String configYamlClassPath;
-    private Map<String, Class> urlServletMap;
+    private Map<String, String> urlServletMap = new HashMap<>();
+    private WebConfigReader webConfigReader;
 
     public MyTomcat(int port) {
         this.port = port;
         this.configYamlClassPath = "web.yml";
+        this.webConfigReader = new WebConfigReader(this.configYamlClassPath);
     }
 
     public MyTomcat(int port, String configYamlClassPath) {
         this.port = port;
         this.configYamlClassPath = configYamlClassPath;
+        this.webConfigReader = new WebConfigReader(this.configYamlClassPath);
     }
 
     public void start() throws IOException {
@@ -43,13 +45,27 @@ public class MyTomcat {
     }
 
     private void initServletMapping() {
-        urlServletMap = new HashMap<String, Class>();
-        urlServletMap.put("/", HelloWorldServlet.class);
-        urlServletMap.put("/info", InfoServlet.class);
+        try {
+            WebConfig webConfig = this.webConfigReader.parse();
+            List<ServletMapping> servletMappingList = webConfig.getServletMappings();
+            servletMappingList.forEach(sm -> urlServletMap.put(sm.getUrl(), sm.getClzName()));
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage());
+        }
     }
 
     private void dispatch(MyHttpServletRequest request, MyHttpServletResponse response) throws IOException {
-        Class servletClz = urlServletMap.get(request.getUri());
+        String servletClzName = urlServletMap.get(request.getUri());
+        if (servletClzName == null) {
+            notify404(request, response);
+            return;
+        }
+        Class servletClz = null;
+        try {
+            servletClz = Class.forName(servletClzName);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e.getMessage());
+        }
         if (servletClz == null) {
             notify404(request, response);
             return;

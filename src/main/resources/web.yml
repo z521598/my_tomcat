@@ -1,0 +1,7 @@
+servlet:
+- name: hello_world
+  url: /
+  class: com.mytomcat.demo.HelloWorldServlet
+- name: info
+  url: /info
+  class: com.mytomcat.demo.InfoServlet
